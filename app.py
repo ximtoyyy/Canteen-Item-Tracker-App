@@ -149,7 +149,7 @@ def render_inventory_list():
 
 # --- 5. MAIN APP EXECUTION ---
 
-st.title("🧺 Canteen Inventory Tracker (Streamlit)")
+st.title("🧺 Canteen Item Tracker (Streamlit)")
 
 # Create the two main columns for the layout
 col_form, col_list = st.columns([1, 2], gap="large")
@@ -161,11 +161,11 @@ with col_form:
 with col_list:
     total_value = calculate_total_value()
     
-    # Display Total Inventory Value
+    # Display Total Item Value
     st.markdown(
         f"""
         <div style='background-color: #e0f2fe; padding: 15px; border-radius: 8px; border: 1px solid #90cdf4; display: flex; justify-content: space-between; align-items: center;'>
-            <span style='font-size: 1.1rem; font-weight: 500; color: #1e40af;'>Total Inventory Value:</span>
+            <span style='font-size: 1.1rem; font-weight: 500; color: #1e40af;'>Total Item Value:</span>
             <span style='font-size: 1.8rem; font-weight: 700; color: #1d4ed8;'>${total_value:,.2f}</span>
         </div>
         """,
