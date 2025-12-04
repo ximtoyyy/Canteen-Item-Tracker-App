@@ -111,7 +111,7 @@ def render_inventory_list():
                 st.markdown(f"**{prefix}{item['name']}**")
 
             with col_price:
-                st.markdown(f"${item['price']:.2f}")
+                st.markdown(f"₱{item['price']:.2f}")
 
             with col_threshold:
                 st.markdown(f"{item['threshold']}")
