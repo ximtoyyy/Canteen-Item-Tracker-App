@@ -81,7 +81,7 @@
                 <!-- Total Item Value Display -->
                 <div id="inventorySummary" class="bg-indigo-50 p-4 rounded-lg mb-6 flex justify-between items-center border border-indigo-200">
                     <span class="text-lg font-medium text-indigo-700">Total Item Value:</span>
-                    <span id="totalValueDisplay" class="text-2xl font-bold text-indigo-800">$0.00</span>
+                    <span id="totalValueDisplay" class="text-2xl font-bold text-indigo-800">₱0.00</span>
                 </div>
                 
                 <div id="itemList" class="space-y-4 max-h-[70vh] overflow-y-auto">
@@ -191,7 +191,7 @@
             }, 0);
 
             // Update the display element
-            totalValueDisplay.textContent = `$${totalValue.toFixed(2)}`;
+            totalValueDisplay.textContent = `₱{totalValue.toFixed(2)}`;
         };
 
         // --- Item Rendering ---
@@ -223,15 +223,15 @@
                 const isLowStock = item.quantity <= item.threshold;
                 
                 const itemDiv = document.createElement('div');
-                itemDiv.className = `p-4 flex items-center justify-between rounded-lg transition duration-150 ${isLowStock ? 'bg-red-100 border border-red-300' : 'bg-gray-50 border border-gray-200'} hover:shadow-md`;
+                itemDiv.className = `p-4 flex items-center justify-between rounded-lg transition duration-150 ₱{isLowStock ? 'bg-red-100 border border-red-300' : 'bg-gray-50 border border-gray-200'} hover:shadow-md`;
                 itemDiv.innerHTML = `
                     <div class="flex-grow min-w-0">
                         <p class="text-lg font-semibold text-gray-800 truncate">
-                            ${isLowStock ? '<span class="text-red-500 mr-2 text-xl align-middle">🚨</span>' : ''}
-                            ${item.name}
+                            ₱{isLowStock ? '<span class="text-red-500 mr-2 text-xl align-middle">🚨</span>' : ''}
+                            ₱{item.name}
                         </p>
                         <p class="text-sm text-gray-500">
-                            Price: $${item.price.toFixed(2)} | Threshold: ${item.threshold}
+                            Price: ₱{item.price.toFixed(2)} | Threshold: ₱{item.threshold}
                         </p>
                     </div>
 
@@ -241,17 +241,17 @@
 
                         <!-- Quantity Controls -->
                         <div class="flex items-center space-x-1">
-                            <button data-id="${item.id}" data-quantity="${item.quantity}" data-action="decrement" class="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 w-8 h-8 flex items-center justify-center transition">
+                            <button data-id="₱{item.id}" data-quantity="₱{item.quantity}" data-action="decrement" class="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 w-8 h-8 flex items-center justify-center transition">
                                 <span class="font-bold">-</span>
                             </button>
-                            <span class="text-xl font-bold w-12 text-center ${isLowStock ? 'text-red-600' : 'text-indigo-600'}">${item.quantity}</span>
-                            <button data-id="${item.id}" data-quantity="${item.quantity}" data-action="increment" class="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 w-8 h-8 flex items-center justify-center transition">
+                            <span class="text-xl font-bold w-12 text-center ₱{isLowStock ? 'text-red-600' : 'text-indigo-600'}">₱{item.quantity}</span>
+                            <button data-id="₱{item.id}" data-quantity="₱{item.quantity}" data-action="increment" class="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 w-8 h-8 flex items-center justify-center transition">
                                 <span class="font-bold">+</span>
                             </button>
                         </div>
                         
                         <!-- Delete Button (using a simple X icon) -->
-                        <button data-id="${item.id}" data-name="${item.name}" data-action="delete" title="Delete item" class="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition">
+                        <button data-id="₱{item.id}" data-name="₱{item.name}" data-action="delete" title="Delete item" class="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
                         </button>
                     </div>
