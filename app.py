@@ -79,7 +79,7 @@ def render_add_item_form():
 
 def render_inventory_list():
     """Renders the main list of inventory items."""
-    st.markdown("### Current Inventory")
+    st.markdown("### Current Item")
     
     if not st.session_state.canteen_items:
         st.info("No items in stock. Add your first item using the form on the left!")
