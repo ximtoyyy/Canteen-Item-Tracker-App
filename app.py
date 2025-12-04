@@ -62,7 +62,7 @@ def render_add_item_form():
         with col1:
             quantity = st.number_input("Quantity in Stock", min_value=0, value=1, step=1)
         with col2:
-            price = st.number_input("Unit Price ($)", min_value=0.00, value=1.00, step=0.01, format="%.2f")
+            price = st.number_input("Unit Price (₱)", min_value=0.00, value=1.00, step=0.01, format="%.2f")
         with col3:
             threshold = st.number_input("Low Stock Threshold", min_value=1, value=5, step=1)
         
