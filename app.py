@@ -92,7 +92,7 @@ def render_inventory_list():
     # Adjusted columns: [Name (4), Price (2), Threshold (2), Stock (2), Actions (3)]
     header_cols = st.columns([4, 2, 2, 2, 3])
     header_cols[0].markdown("**Item Name**")
-    header_cols[1].markdown("**Price ($)**")
+    header_cols[1].markdown("**Price (₱)**")
     header_cols[2].markdown("**Threshold**")
     header_cols[3].markdown("**Stock**")
     header_cols[4].markdown("**Actions**")
@@ -166,7 +166,7 @@ with col_list:
         f"""
         <div style='background-color: #e0f2fe; padding: 15px; border-radius: 8px; border: 1px solid #90cdf4; display: flex; justify-content: space-between; align-items: center;'>
             <span style='font-size: 1.1rem; font-weight: 500; color: #1e40af;'>Total Item Value:</span>
-            <span style='font-size: 1.8rem; font-weight: 700; color: #1d4ed8;'>${total_value:,.2f}</span>
+            <span style='font-size: 1.8rem; font-weight: 700; color: #1d4ed8;'>₱{total_value:,.2f}</span>
         </div>
         """,
         unsafe_allow_html=True
