@@ -1,23 +1,15 @@
+import streamlit as st
 import json
 import os
 from typing import List, Dict, Union
 
 # --- Configuration ---
 DATA_FILE = "inventory.json"
+ITEM_DTYPE = Dict[str, Union[str, int, float]]
 
-# --- Data Structure ---
-# Each item is a dictionary:
-# {
-#     "id": "1",
-#     "name": "Bottled Water",
-#     "quantity": 50,
-#     "price": 15.00,
-#     "threshold": 10
-# }
+# --- Persistence Functions (Adapted for Streamlit) ---
 
-# --- Persistence Functions ---
-
-def load_items() -> List[Dict[str, Union[str, int, float]]]:
+def load_items() -> List[ITEM_DTYPE]:
     """Loads inventory items from the JSON data file."""
     if not os.path.exists(DATA_FILE):
         return []
@@ -31,16 +23,16 @@ def load_items() -> List[Dict[str, Union[str, int, float]]]:
                 item['threshold'] = int(item.get('threshold', 1))
             return data
     except (IOError, json.JSONDecodeError):
-        print(f"Warning: Could not read or parse {DATA_FILE}. Starting with empty inventory.")
+        st.error(f"Error loading {DATA_FILE}. Starting with empty inventory.")
         return []
 
-def save_items(items: List[Dict[str, Union[str, int, float]]]):
+def save_items(items: List[ITEM_DTYPE]):
     """Saves the current inventory items to the JSON data file."""
     try:
         with open(DATA_FILE, 'w') as f:
             json.dump(items, f, indent=4)
     except IOError:
-        print(f"Error: Could not write data to {DATA_FILE}.")
+        st.error(f"Error: Could not write data to {DATA_FILE}.")
 
 def get_next_id(items: List) -> int:
     """Calculates the next unique ID based on existing items."""
@@ -52,199 +44,235 @@ def get_next_id(items: List) -> int:
         try:
             max_id = max(max_id, int(item['id']))
         except ValueError:
-            # Skip invalid IDs
             continue
     return max_id + 1
 
-# --- Core Logic Functions ---
+# --- State Management & Actions ---
 
-def display_items(items: List):
-    """Displays the current inventory, highlighting low stock items and showing total value."""
+def init_state():
+    """Initializes session state variables."""
+    if 'items' not in st.session_state:
+        st.session_state.items = load_items()
+    if 'next_id' not in st.session_state:
+        st.session_state.next_id = get_next_id(st.session_state.items)
+    if 'edit_id' not in st.session_state:
+        st.session_state.edit_id = None
+        
+def update_inventory_and_save():
+    """Saves the current session state items to the file."""
+    save_items(st.session_state.items)
+
+def add_item_action(name, quantity, price, threshold):
+    """Adds a new item to the inventory."""
+    new_item = {
+        "id": str(st.session_state.next_id),
+        "name": name,
+        "quantity": quantity,
+        "price": round(price, 2),
+        "threshold": threshold,
+    }
+    st.session_state.items.append(new_item)
+    st.session_state.next_id += 1
+    update_inventory_and_save()
+    st.success(f"Item '{name}' added successfully!")
+
+def update_quantity_action(item_id: str, change: int):
+    """Increases or decreases an item's quantity."""
+    item_index = next((i for i, item in enumerate(st.session_state.items) if item['id'] == item_id), -1)
+    
+    if item_index != -1:
+        item = st.session_state.items[item_index]
+        new_quantity = item['quantity'] + change
+        
+        if new_quantity >= 0:
+            item['quantity'] = new_quantity
+            update_inventory_and_save()
+        else:
+            st.warning("Quantity cannot be negative.")
+
+def set_edit_mode(item_id: str):
+    """Sets the item ID for the edit form."""
+    st.session_state.edit_id = item_id
+
+def delete_item_action(item_id: str):
+    """Deletes an item from the inventory."""
+    st.session_state.items = [item for item in st.session_state.items if item['id'] != item_id]
+    update_inventory_and_save()
+    st.success("Item deleted.")
+
+# --- UI Components ---
+
+def render_add_item_form():
+    """Renders the form for adding a new canteen item."""
+    st.sidebar.header("Add New Item")
+    with st.sidebar.form(key='add_form'):
+        name = st.text_input("Item Name", key='new_name')
+        quantity = st.number_input("Quantity in Stock", min_value=0, value=1, step=1, key='new_quantity')
+        price = st.number_input("Unit Price (₱)", min_value=0.0, value=1.00, step=0.01, format="%.2f", key='new_price')
+        threshold = st.number_input("Low Stock Threshold", min_value=1, value=5, step=1, key='new_threshold')
+        
+        submitted = st.form_submit_button("Add Item", type="primary")
+
+        if submitted:
+            if name:
+                add_item_action(name, quantity, price, threshold)
+            else:
+                st.error("Item Name is required.")
+
+def render_inventory_list():
+    """Renders the main inventory table with controls."""
+    items = st.session_state.items
+    
     if not items:
-        print("\n--- Inventory is Empty ---")
+        st.info("Inventory is empty. Add items using the form on the sidebar.")
         return
 
     # Sort items: Low stock first, then by name
-    items.sort(key=lambda x: (x['quantity'] <= x['threshold'], x['name']))
+    sorted_items = sorted(items, key=lambda x: (x['quantity'] <= x['threshold'], x['name']))
 
-    print("\n" + "="*80)
-    print("CANTEEN INVENTORY LIST".center(80))
-    print("="*80)
-    print(f"{'ID':<4} | {'Item Name':<30} | {'Quantity':<10} | {'Price (₱)':<12} | {'Threshold':<10} | {'Status':<8}")
-    print("-" * 80)
+    st.subheader("Inventory List")
 
-    total_value = 0
-    for item in items:
+    # Create columns for the table header
+    col_layout = [0.5, 2.5, 1, 1, 1, 2]
+    cols = st.columns(col_layout)
+    cols[0].write("**ID**")
+    cols[1].write("**Item Name**")
+    cols[2].write("**Quantity**")
+    cols[3].write("**Price (₱)**")
+    cols[4].write("**Threshold**")
+    cols[5].write("**Actions**")
+    st.markdown("---") # Separator line
+
+    # Render items row by row
+    for item in sorted_items:
         is_low_stock = item['quantity'] <= item['threshold']
-        status = "🚨 LOW" if is_low_stock else "OK"
         
-        # Calculate individual item value and add to total
-        total_value += item['quantity'] * item['price']
+        cols = st.columns(col_layout)
+        
+        # ID, Name, Quantity
+        cols[0].write(item['id'])
+        cols[1].markdown(f"**{'🚨' if is_low_stock else ''} {item['name']}**")
+        cols[2].markdown(f"**{item['quantity']}**")
+        
+        # Price, Threshold
+        cols[3].write(f"₱{item['price']:.2f}")
+        cols[4].write(item['threshold'])
 
-        # Format price with two decimal places
-        price_str = f"₱{item['price']:.2f}"
+        # Action Buttons
+        with cols[5]:
+            # Use a container for better horizontal layout of small buttons
+            btn_cols = st.columns([1, 1, 1.5, 1.5])
+            
+            # Decrement button
+            btn_cols[0].button("–", key=f"dec_{item['id']}", 
+                               on_click=update_quantity_action, args=(item['id'], -1), 
+                               disabled=(item['quantity'] == 0), help="Decrement stock by 1")
+            
+            # Increment button
+            btn_cols[1].button("+", key=f"inc_{item['id']}", 
+                               on_click=update_quantity_action, args=(item['id'], 1), 
+                               type="primary", help="Increment stock by 1")
 
-        print(f"{item['id']:<4} | {item['name'][:30]:<30} | {item['quantity']:<10} | {price_str:<12} | {item['threshold']:<10} | {status:<8}")
+            # Edit button
+            btn_cols[2].button("Edit", key=f"edit_{item['id']}", 
+                               on_click=set_edit_mode, args=(item['id'],), 
+                               help="Edit item details", use_container_width=True)
+            
+            # Delete button
+            btn_cols[3].button("Del", key=f"del_{item['id']}", 
+                               on_click=delete_item_action, args=(item['id'],), 
+                               help="Delete item permanently", type="secondary", use_container_width=True)
+
+def render_inventory_summary():
+    """Calculates and displays the total inventory value."""
+    total_value = sum(item['quantity'] * item['price'] for item in st.session_state.items)
+    total_items = len(st.session_state.items)
+    low_stock_count = sum(1 for item in st.session_state.items if item['quantity'] <= item['threshold'])
+
+    col1, col2, col3 = st.columns(3)
     
-    print("-" * 80)
-    # Format total value with commas and two decimal places
-    total_value_str = f"₱{total_value:,.2f}"
-    print(f"Total Inventory Value: {total_value_str}")
-    print("="*80 + "\n")
+    col1.metric(
+        label="Total Inventory Value", 
+        value=f"₱{total_value:,.2f}", 
+        delta="Calculated based on current stock"
+    )
+    col2.metric(
+        label="Total Unique Items",
+        value=total_items,
+    )
+    col3.metric(
+        label="Low Stock Alerts",
+        value=low_stock_count,
+        delta_color="inverse"
+    )
+    
+    st.markdown("---")
 
-
-def add_item(items: List):
-    """Prompts user for item details and adds a new item to the inventory."""
-    print("\n--- Add New Item ---")
-    name = input("Enter Item Name: ").strip()
-    if not name:
-        print("Item name cannot be empty.")
+def render_edit_form():
+    """Renders the edit form if an item is selected for editing."""
+    item_id = st.session_state.edit_id
+    if item_id is None:
         return
-
+    
     try:
-        quantity = int(input("Enter Quantity in Stock (>= 0): "))
-        price = float(input("Enter Unit Price (₱, >= 0.00): "))
-        threshold = int(input("Enter Low Stock Threshold (>= 1): "))
-    except ValueError:
-        print("Invalid input for quantity, price, or threshold. Please use numbers.")
-        return
-    
-    if quantity < 0 or price < 0 or threshold < 1:
-        print("Invalid data: Quantity/Price must be >= 0, Threshold must be >= 1.")
-        return
-
-    new_id = str(get_next_id(items))
-    new_item = {
-        "id": new_id,
-        "name": name,
-        "quantity": quantity,
-        "price": round(price, 2), # Round price to 2 decimal places
-        "threshold": threshold,
-    }
-    
-    items.append(new_item)
-    save_items(items)
-    print(f"Successfully added item: {name} (ID: {new_id})")
-
-
-def update_quantity(items: List, change: int):
-    """Prompts user for an item ID and updates its quantity by the specified change (+1 or -1)."""
-    item_id = input("Enter ID of item to update: ").strip()
-    try:
-        item = next(item for item in items if item['id'] == item_id)
+        item_to_edit = next(item for item in st.session_state.items if item['id'] == item_id)
     except StopIteration:
-        print(f"Error: Item with ID '{item_id}' not found.")
+        st.session_state.edit_id = None # Item not found, reset state
         return
 
-    new_quantity = item['quantity'] + change
-    if new_quantity < 0:
-        print("Cannot decrement quantity below 0.")
-        return
-
-    item['quantity'] = new_quantity
-    save_items(items)
-    action = "Increased" if change > 0 else "Decreased"
-    print(f"{action} quantity of {item['name']} to {new_quantity}.")
-
-
-def edit_item(items: List):
-    """Prompts user for an item ID and allows editing all its details."""
-    item_id = input("Enter ID of item to edit: ").strip()
-    try:
-        item = next(item for item in items if item['id'] == item_id)
-    except StopIteration:
-        print(f"Error: Item with ID '{item_id}' not found.")
-        return
-
-    print(f"\n--- Editing Item: {item['name']} (ID: {item['id']}) ---")
-    print("Enter new values (leave blank to keep current value).")
-
-    new_name = input(f"New Name [{item['name']}]: ").strip() or item['name']
+    st.header(f"✏️ Edit Item: {item_to_edit['name']}")
     
-    # Use existing value as default in prompt
-    new_quantity_str = input(f"New Quantity [{item['quantity']}]: ").strip()
-    new_price_str = input(f"New Price (₱) [{item['price']:.2f}]: ").strip()
-    new_threshold_str = input(f"New Threshold [{item['threshold']}]: ").strip()
+    # Use a container for the edit form
+    with st.container(border=True):
+        with st.form(key='edit_form', clear_on_submit=False):
+            st.markdown(f"Editing Item ID: `{item_id}`")
+            
+            # Pre-populate fields with current values
+            new_name = st.text_input("Item Name", value=item_to_edit['name'], key='edit_name')
+            
+            col_q, col_p, col_t = st.columns(3)
+            new_quantity = col_q.number_input("Quantity", min_value=0, value=item_to_edit['quantity'], step=1, key='edit_quantity')
+            new_price = col_p.number_input("Unit Price (₱)", min_value=0.0, value=item_to_edit['price'], step=0.01, format="%.2f", key='edit_price')
+            new_threshold = col_t.number_input("Threshold", min_value=1, value=item_to_edit['threshold'], step=1, key='edit_threshold')
 
-    try:
-        # Parse inputs, defaulting to current value if blank
-        new_quantity = int(new_quantity_str) if new_quantity_str else item['quantity']
-        new_price = float(new_price_str) if new_price_str else item['price']
-        new_threshold = int(new_threshold_str) if new_threshold_str else item['threshold']
-    except ValueError:
-        print("Invalid number entered. Edit cancelled.")
-        return
+            col_submit, col_cancel = st.columns([1, 4])
+            
+            save_button = col_submit.form_submit_button("Save Changes", type="primary")
+            col_cancel.button("Cancel", on_click=lambda: st.session_state.__setitem__('edit_id', None))
+            
+            if save_button:
+                item_to_edit['name'] = new_name
+                item_to_edit['quantity'] = new_quantity
+                item_to_edit['price'] = round(new_price, 2)
+                item_to_edit['threshold'] = new_threshold
+                
+                update_inventory_and_save()
+                st.session_state.edit_id = None # Exit edit mode
+                st.rerun() # Rerun to refresh the list
 
-    if new_quantity < 0 or new_price < 0 or new_threshold < 1:
-        print("Invalid data: Quantity/Price must be >= 0, Threshold must be >= 1. Edit cancelled.")
-        return
+# --- Main App Execution ---
 
-    # Update item properties
-    item['name'] = new_name
-    item['quantity'] = new_quantity
-    item['price'] = round(new_price, 2)
-    item['threshold'] = new_threshold
+def main_app():
+    """Runs the main Streamlit application."""
+    st.set_page_config(layout="wide", page_title="Canteen Inventory Tracker", page_icon="📝")
 
-    save_items(items)
-    print(f"\nSuccessfully updated item: {item['name']}.")
+    st.title("📝 Canteen Inventory Tracker (Streamlit)")
+    st.caption("Data is persisted in `inventory.json` locally.")
 
+    init_state()
 
-def delete_item(items: List):
-    """Prompts user for an item ID and deletes it after confirmation."""
-    item_id = input("Enter ID of item to delete: ").strip()
+    # 1. Sidebar for Adding Items
+    render_add_item_form()
+
+    # 2. Main Content Area
     
-    try:
-        item_index = next(i for i, item in enumerate(items) if item['id'] == item_id)
-    except StopIteration:
-        print(f"Error: Item with ID '{item_id}' not found.")
-        return
-    
-    item_name = items[item_index]['name']
-    confirm = input(f"Are you sure you want to delete '{item_name}' (ID: {item_id})? (yes/no): ").lower().strip()
-    
-    if confirm == 'yes':
-        del items[item_index]
-        save_items(items)
-        print(f"Item '{item_name}' deleted.")
+    # If an item is selected for editing, show the edit form
+    if st.session_state.edit_id is not None:
+        render_edit_form()
     else:
-        print("Deletion cancelled.")
+        # Otherwise, show the summary and the main list
+        render_inventory_summary()
+        render_inventory_list()
 
-# --- Main Application Loop ---
-
-def main():
-    """Main function to run the Canteen Tracker CLI."""
-    items = load_items()
-    
-    while True:
-        display_items(items)
-        print("\n--- Menu ---")
-        print("1. Add New Item")
-        print("2. Increase Stock (+1)")
-        print("3. Decrease Stock (-1)")
-        print("4. Edit Item Details")
-        print("5. Delete Item")
-        print("6. Exit")
-        
-        choice = input("Enter your choice (1-6): ").strip()
-
-        if choice == '1':
-            add_item(items)
-        elif choice == '2':
-            update_quantity(items, 1)
-        elif choice == '3':
-            update_quantity(items, -1)
-        elif choice == '4':
-            edit_item(items)
-        elif choice == '5':
-            delete_item(items)
-        elif choice == '6':
-            print("Exiting Canteen Tracker. Goodbye!")
-            break
-        else:
-            print("Invalid choice. Please enter a number between 1 and 6.")
-        
-        input("\nPress Enter to continue...")
-
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    main_app()
