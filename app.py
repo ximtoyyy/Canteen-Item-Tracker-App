@@ -149,14 +149,14 @@ def render_inventory_list():
 
 # --- 5. MAIN APP EXECUTION ---
 
-st.title("🧺 Canteen Item Tracker (Streamlit)")
+st.title("🧺 Canteen Item Tracker")
 
 # Create the two main columns for the layout
 col_form, col_list = st.columns([1, 2], gap="large")
 
 with col_form:
     # Removed conditional check for edit_id
-    render_add_item_form()  
+    render_add_item_form() 
 
 with col_list:
     total_value = calculate_total_value()
