@@ -1,480 +1,731 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Canteen Item Tracker</title>
+
     <!-- Tailwind CSS CDN -->
+
     <script src="https://cdn.tailwindcss.com"></script>
+
     <!-- Inter Font -->
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
     <style>
+
         body {
+
             font-family: 'Inter', sans-serif;
+
             background-color: #f7f9fb;
+
         }
+
         .card {
+
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
             background-color: white;
+
             border-radius: 1rem;
+
         }
+
         /* Custom scrollbar for item list */
+
         #itemList::-webkit-scrollbar {
+
             width: 8px;
+
         }
+
         #itemList::-webkit-scrollbar-thumb {
+
             background-color: #cbd5e1;
+
             border-radius: 4px;
+
         }
+
     </style>
+
 </head>
+
 <body class="min-h-screen p-4 md:p-8">
 
+
+
     <div id="app" class="max-w-4xl mx-auto">
+
         <header class="text-center mb-8">
+
             <h1 class="text-4xl font-bold text-gray-800 tracking-tight">Canteen Item Tracker</h1>
-            <p class="text-gray-500 mt-1">Local item tracking using only browser storage (Local-Only Data).</p>
+
+            <p class="text-gray-500 mt-1">Local item tracking using only browser storage.</p>
+
             <div id="authStatus" class="mt-4 text-sm text-gray-600 p-2 bg-indigo-100 rounded-lg">
+
                 Loading data from local storage...
+
             </div>
+
         </header>
 
+
+
         <!-- Loading Indicator -->
+
         <div id="loadingIndicator" class="text-center py-12 text-lg text-indigo-600 font-semibold">
+
             Initializing application...
+
         </div>
+
+
 
         <!-- Main Content (Hidden until initialized) -->
+
         <div id="mainContent" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
+
             
+
             <!-- Add New Item Form -->
+
             <div class="lg:col-span-1 card p-6 h-fit sticky top-8">
+
                 <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">Add New Item</h2>
+
                 <form id="addItemForm">
+
                     <div class="mb-4">
+
                         <label for="itemName" class="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+
                         <input type="text" id="itemName" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+
                     </div>
+
                     <div class="mb-4">
+
                         <label for="itemQuantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity in Stock</label>
+
                         <input type="number" id="itemQuantity" required min="0" value="1" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+
                     </div>
+
                     <div class="mb-4">
+
                         <label for="itemPrice" class="block text-sm font-medium text-gray-700 mb-1">Unit Price (₱)</label>
+
                         <input type="number" id="itemPrice" required min="0" step="0.01" value="1.00" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+
                     </div>
+
                     <div class="mb-4">
+
                         <label for="lowStockThreshold" class="block text-sm font-medium text-gray-700 mb-1">Low Stock Threshold</label>
+
                         <input type="number" id="lowStockThreshold" required min="1" value="5" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+
                     </div>
+
                     <button type="submit" class="w-full bg-indigo-600 text-white font-semibold py-2 rounded-lg hover:bg-indigo-700 transition duration-150 ease-in-out shadow-lg shadow-indigo-200">
+
                         Add Item
+
                     </button>
+
                     <div id="addError" class="text-red-500 text-sm mt-2 hidden"></div>
+
                 </form>
+
             </div>
+
+
 
             <!-- Item List -->
+
             <div class="lg:col-span-2 card p-6">
-                <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">Inventory List</h2>
+
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4 border-b pb-2">Current Item</h2>
+
+
 
                 <!-- Total Item Value Display -->
+
                 <div id="inventorySummary" class="bg-indigo-50 p-4 rounded-lg mb-6 flex justify-between items-center border border-indigo-200">
-                    <span class="text-lg font-medium text-indigo-700">Total Inventory Value:</span>
+
+                    <span class="text-lg font-medium text-indigo-700">Total Item Value:</span>
+
                     <span id="totalValueDisplay" class="text-2xl font-bold text-indigo-800">₱0.00</span>
+
                 </div>
+
                 
+
                 <div id="itemList" class="space-y-4 max-h-[70vh] overflow-y-auto">
+
                     <!-- Items will be injected here by JavaScript -->
+
                     <p id="emptyState" class="text-gray-500 text-center py-8 hidden">No items in stock. Add your first item!</p>
+
                 </div>
+
             </div>
+
+
 
         </div>
 
+
+
     </div>
+
+
 
     <!-- Modal for Confirming Deletion -->
-    <div id="deleteModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h3>
-            <p class="text-gray-600 mb-6">Are you sure you want to delete <span id="modalItemName" class="font-semibold text-indigo-600"></span>? This action cannot be undone.</p>
-            <div class="flex justify-end space-x-3">
-                <button id="cancelDeleteBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition duration-150">Cancel</button>
-                <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-150 shadow-lg shadow-red-200">Delete Permanently</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Modal for Editing Item -->
-    <div id="editModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-lg w-full">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">Edit Item: <span id="editItemNameDisplay" class="text-indigo-600"></span></h3>
-            
-            <form id="editItemForm">
-                <input type="hidden" id="editItemId">
-                
-                <div class="mb-4">
-                    <label for="editItemName" class="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
-                    <input type="text" id="editItemName" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
-                <div class="grid grid-cols-3 gap-4 mb-6">
-                    <div>
-                        <label for="editItemQuantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-                        <input type="number" id="editItemQuantity" required min="0" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                    <div>
-                        <label for="editItemPrice" class="block text-sm font-medium text-gray-700 mb-1">Unit Price (₱)</label>
-                        <input type="number" id="editItemPrice" required min="0" step="0.01" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                    <div>
-                        <label for="editLowStockThreshold" class="block text-sm font-medium text-gray-700 mb-1">Threshold</label>
-                        <input type="number" id="editLowStockThreshold" required min="1" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                </div>
-                
-                <div id="editError" class="text-red-500 text-sm mt-2 hidden"></div>
 
-                <div class="flex justify-end space-x-3 pt-4 border-t">
-                    <button type="button" id="cancelEditBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition duration-150">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150 shadow-lg shadow-indigo-200">Save Changes</button>
-                </div>
-            </form>
+    <div id="deleteModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full">
+
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h3>
+
+            <p class="text-gray-600 mb-6">Are you sure you want to delete <span id="modalItemName" class="font-semibold text-indigo-600"></span>? This action cannot be undone.</p>
+
+            <div class="flex justify-end space-x-3">
+
+                <button id="cancelDeleteBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition duration-150">Cancel</button>
+
+                <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition duration-150 shadow-lg shadow-red-200">Delete Permanently</button>
+
+            </div>
+
         </div>
+
     </div>
+
+    
+
+    <!-- Removed: Edit Modal HTML -->
+
+
+
+
 
     <!-- Application Logic using LocalStorage -->
+
     <script>
+
         // Global variables for local storage
+
         let canteenItems = []; // Array to hold all stock items
+
         let nextItemId = 1; // Simple counter for unique IDs
 
+
+
         const loadingIndicator = document.getElementById('loadingIndicator');
+
         const mainContent = document.getElementById('mainContent');
+
         const authStatus = document.getElementById('authStatus');
+
         const itemListContainer = document.getElementById('itemList');
+
         const emptyState = document.getElementById('emptyState');
+
         const addItemForm = document.getElementById('addItemForm');
+
         const addError = document.getElementById('addError');
 
+
+
         // Total value display
+
         const totalValueDisplay = document.getElementById('totalValueDisplay');
 
-        // Delete Modal elements
+
+
+        // Modal elements (only delete remaining)
+
         const deleteModal = document.getElementById('deleteModal');
+
         const modalItemName = document.getElementById('modalItemName');
+
         const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+
         const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
         let itemToDeleteId = null;
 
-        // Edit Modal elements
-        const editModal = document.getElementById('editModal');
-        const editItemForm = document.getElementById('editItemForm');
-        const editItemNameDisplay = document.getElementById('editItemNameDisplay');
-        const editItemId = document.getElementById('editItemId');
-        const editItemName = document.getElementById('editItemName');
-        const editItemQuantity = document.getElementById('editItemQuantity');
-        const editItemPrice = document.getElementById('editItemPrice');
-        const editLowStockThreshold = document.getElementById('editLowStockThreshold');
-        const editError = document.getElementById('editError');
-        const cancelEditBtn = document.getElementById('cancelEditBtn');
         
+
+        // Removed: Edit Modal element definitions
+
+
+
+
+
         // --- Local Storage Persistence ---
 
+
+
         /**
+
          * Loads items from localStorage and initializes global variables.
+
          */
+
         const loadItems = () => {
+
             try {
+
                 const storedItems = localStorage.getItem('canteenTrackerItems');
+
                 const storedId = localStorage.getItem('canteenTrackerNextId');
+
                 
+
                 if (storedItems) {
+
                     canteenItems = JSON.parse(storedItems);
-                    // Ensure quantities, prices, and thresholds are correctly typed numbers
+
+                    // Ensure quantities and prices are numbers
+
                     canteenItems = canteenItems.map(item => ({
+
                         ...item,
+
                         quantity: Number(item.quantity) || 0,
+
                         price: Number(item.price) || 0,
+
                         threshold: Number(item.threshold) || 1,
+
                     }));
+
                 }
+
                 if (storedId) {
+
                     nextItemId = Number(storedId);
+
                 }
+
                 
+
                 authStatus.innerHTML = '✅ Data stored locally in your browser.';
+
                 
+
             } catch (error) {
+
                 console.error("Error loading from localStorage:", error);
+
                 authStatus.innerHTML = '⚠️ Local storage access failed. Data will not persist across sessions.';
+
                 canteenItems = [];
+
             }
+
         };
 
+
+
         /**
+
          * Saves the current items array and the next ID counter to localStorage.
+
          */
+
         const saveItems = () => {
+
             try {
+
                 localStorage.setItem('canteenTrackerItems', JSON.stringify(canteenItems));
+
                 localStorage.setItem('canteenTrackerNextId', nextItemId);
+
             } catch (error) {
+
                 console.error("Error saving to localStorage:", error);
+
             }
+
         };
 
+
+
         /**
+
          * Calculates the total monetary value of all items in stock.
+
          */
+
         const calculateTotalValue = () => {
+
             const totalValue = canteenItems.reduce((sum, item) => {
+
                 // Calculation: quantity * price
+
                 return sum + (item.quantity * item.price);
+
             }, 0);
 
-            // Update the display element with PHP currency format
-            totalValueDisplay.textContent = `₱${totalValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`; // Added comma formatting
+
+
+            // Update the display element
+
+            totalValueDisplay.textContent = `₱{totalValue.toFixed(2)}`;
+
         };
+
+
 
         // --- Item Rendering ---
 
+
+
         /**
+
          * Renders the list of items based on the current local array data.
+
          * @param {Array} items - Array of item objects.
+
          */
+
         const renderItems = (items) => {
+
             itemListContainer.innerHTML = '';
+
             
+
             if (items.length === 0) {
+
                 emptyState.classList.remove('hidden');
+
             } else {
+
                 emptyState.classList.add('hidden');
+
             }
+
+
 
             // Sort items: Low stock first, then by name
+
             items.sort((a, b) => {
+
                 const isLowA = a.quantity <= a.threshold;
+
                 const isLowB = b.quantity <= b.threshold;
 
+
+
                 if (isLowA && !isLowB) return -1; // A comes first (low stock)
+
                 if (!isLowA && isLowB) return 1;  // B comes first (low stock)
+
                 return a.name.localeCompare(b.name); // Sort by name otherwise
+
             });
+
+
 
             items.forEach(item => {
+
                 const isLowStock = item.quantity <= item.threshold;
+
                 
+
                 const itemDiv = document.createElement('div');
-                itemDiv.className = `p-4 flex flex-col md:flex-row items-start md:items-center justify-between rounded-lg transition duration-150 ${isLowStock ? 'bg-red-100 border border-red-300' : 'bg-gray-50 border border-gray-200'} hover:shadow-md`;
-                
+
+                itemDiv.className = `p-4 flex items-center justify-between rounded-lg transition duration-150 ₱{isLowStock ? 'bg-red-100 border border-red-300' : 'bg-gray-50 border border-gray-200'} hover:shadow-md`;
+
                 itemDiv.innerHTML = `
-                    <div class="flex-grow min-w-0 mb-3 md:mb-0">
+
+                    <div class="flex-grow min-w-0">
+
                         <p class="text-lg font-semibold text-gray-800 truncate">
-                            ${isLowStock ? '<span class="text-red-500 mr-2 text-xl align-middle">🚨</span>' : ''}
-                            ${item.name}
+
+                            ₱{isLowStock ? '<span class="text-red-500 mr-2 text-xl align-middle">🚨</span>' : ''}
+
+                            ₱{item.name}
+
                         </p>
-                        <p class="text-sm text-gray-500 md:flex md:space-x-4">
-                            <span>Price: ₱${item.price.toFixed(2)}</span>
-                            <span class="md:block hidden">|</span>
-                            <span>Threshold: ${item.threshold}</span>
+
+                        <p class="text-sm text-gray-500">
+
+                            Price: ₱{item.price.toFixed(2)} | Threshold: ₱{item.threshold}
+
                         </p>
+
                     </div>
 
-                    <div class="flex items-center space-x-3 w-full md:w-auto">
+
+
+                    <div class="flex items-center space-x-3 ml-4">
+
                         
-                        <!-- Edit Button -->
-                        <button data-id="${item.id}" data-action="edit" title="Edit item details" class="p-2 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 transition">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                        </button>
+
+                        <!-- Removed: Edit Button -->
+
+
 
                         <!-- Quantity Controls -->
+
                         <div class="flex items-center space-x-1">
-                            <button data-id="${item.id}" data-action="decrement" class="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 w-8 h-8 flex items-center justify-center transition disabled:opacity-50" ${item.quantity === 0 ? 'disabled' : ''}>
+
+                            <button data-id="₱{item.id}" data-quantity="₱{item.quantity}" data-action="decrement" class="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 w-8 h-8 flex items-center justify-center transition">
+
                                 <span class="font-bold">-</span>
+
                             </button>
-                            <span class="text-xl font-bold w-12 text-center ${isLowStock ? 'text-red-600' : 'text-indigo-600'}">${item.quantity}</span>
-                            <button data-id="${item.id}" data-action="increment" class="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 w-8 h-8 flex items-center justify-center transition">
+
+                            <span class="text-xl font-bold w-12 text-center ₱{isLowStock ? 'text-red-600' : 'text-indigo-600'}">₱{item.quantity}</span>
+
+                            <button data-id="₱{item.id}" data-quantity="₱{item.quantity}" data-action="increment" class="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 w-8 h-8 flex items-center justify-center transition">
+
                                 <span class="font-bold">+</span>
+
                             </button>
+
                         </div>
+
                         
+
                         <!-- Delete Button (using a simple X icon) -->
-                        <button data-id="${item.id}" data-name="${item.name}" data-action="delete" title="Delete item" class="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition">
+
+                        <button data-id="₱{item.id}" data-name="₱{item.name}" data-action="delete" title="Delete item" class="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition">
+
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>
+
                         </button>
+
                     </div>
+
                 `;
+
                 itemListContainer.appendChild(itemDiv);
+
             });
+
             
+
             // Calculate and display total value after rendering all items
+
             calculateTotalValue();
+
         };
 
-        // --- Edit Modal Logic ---
 
-        /**
-         * Opens the edit modal and populates the form with item data.
-         * @param {string} itemId - The ID of the item to edit.
-         */
-        const openEditModal = (itemId) => {
-            const itemToEdit = canteenItems.find(item => item.id === itemId);
-            if (!itemToEdit) return;
 
-            editItemId.value = itemToEdit.id;
-            editItemName.value = itemToEdit.name;
-            editItemQuantity.value = itemToEdit.quantity;
-            editItemPrice.value = itemToEdit.price.toFixed(2);
-            editLowStockThreshold.value = itemToEdit.threshold;
-            
-            editItemNameDisplay.textContent = itemToEdit.name;
-            editError.classList.add('hidden');
-            editModal.classList.remove('hidden');
-        };
-        
-        /**
-         * Handles saving the changes from the edit modal.
-         */
-        editItemForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            editError.classList.add('hidden');
+        // --- Event Handlers (Updated for local array/localStorage) ---
 
-            const id = editItemId.value;
-            const name = editItemName.value.trim();
-            const quantity = parseInt(editItemQuantity.value, 10);
-            const price = parseFloat(editItemPrice.value);
-            const threshold = parseInt(editLowStockThreshold.value, 10);
 
-            if (!name || isNaN(quantity) || isNaN(price) || isNaN(threshold) || quantity < 0 || price < 0 || threshold < 1) {
-                editError.textContent = "Please ensure all fields are valid (Quantity/Price >= 0, Threshold >= 1, Name not empty).";
-                editError.classList.remove('hidden');
-                return;
-            }
-
-            const itemIndex = canteenItems.findIndex(item => item.id === id);
-            if (itemIndex === -1) {
-                editError.textContent = "Item not found.";
-                editError.classList.remove('hidden');
-                return;
-            }
-
-            // Update the item properties
-            canteenItems[itemIndex].name = name;
-            canteenItems[itemIndex].quantity = quantity;
-            canteenItems[itemIndex].price = parseFloat(price.toFixed(2));
-            canteenItems[itemIndex].threshold = threshold;
-
-            saveItems();
-            renderItems(canteenItems);
-            editModal.classList.add('hidden');
-        });
-
-        // Cancel Edit button handler
-        cancelEditBtn.addEventListener('click', () => {
-            editModal.classList.add('hidden');
-        });
-
-        // --- General Event Handlers ---
 
         addItemForm.addEventListener('submit', (e) => {
+
             e.preventDefault();
+
             addError.classList.add('hidden');
 
+
+
             const name = document.getElementById('itemName').value.trim();
+
             const quantity = parseInt(document.getElementById('itemQuantity').value, 10);
+
             const price = parseFloat(document.getElementById('itemPrice').value);
+
             const threshold = parseInt(document.getElementById('lowStockThreshold').value, 10);
 
+
+
             if (!name || isNaN(quantity) || isNaN(price) || isNaN(threshold) || quantity < 0 || price < 0 || threshold < 1) {
-                addError.textContent = "Please ensure all fields are valid (Quantity/Price >= 0, Threshold >= 1, Name not empty).";
+
+                addError.textContent = "Please ensure all fields are valid (Quantity/Price >= 0, Threshold >= 1).";
+
                 addError.classList.remove('hidden');
+
                 return;
+
             }
+
+
 
             const newItem = {
+
                 id: (nextItemId++).toString(), // Generate new unique ID
+
                 name,
+
                 quantity,
+
                 price: parseFloat(price.toFixed(2)), // Ensure price is two decimal places
+
                 threshold,
+
             };
 
+
+
             canteenItems.push(newItem);
+
             saveItems(); // Save to local storage
+
             renderItems(canteenItems); // Re-render the list (and updates total value)
 
+
+
             // Reset form
+
             addItemForm.reset();
-            document.getElementById('itemQuantity').value = 1;  
-            document.getElementById('itemPrice').value = '1.00';  
+
+            document.getElementById('itemQuantity').value = 1; 
+
+            document.getElementById('itemPrice').value = '1.00'; 
+
             document.getElementById('lowStockThreshold').value = 5;
+
         });
+
+
 
         itemListContainer.addEventListener('click', (e) => {
+
             const button = e.target.closest('button');
+
             if (!button) return;
 
+
+
             const itemId = button.dataset.id;
+
             const action = button.dataset.action;
 
+
+
             const itemIndex = canteenItems.findIndex(item => item.id === itemId);
+
             if (itemIndex === -1) return;
 
-            if (action === 'increment' || action === 'decrement') {
-                const item = canteenItems[itemIndex];
-                const change = action === 'increment' ? 1 : -1;
-                const newQuantity = Math.max(0, item.quantity + change);
 
-                if (newQuantity === item.quantity && change === -1) { 
-                    // Prevents decrementing below zero
-                    return;  
-                }
+
+            if (action === 'increment' || action === 'decrement') {
+
+                const item = canteenItems[itemIndex];
+
+                const newQuantity = action === 'increment' ? item.quantity + 1 : Math.max(0, item.quantity - 1);
+
+
+
+                if (newQuantity === item.quantity) return; 
+
+
 
                 item.quantity = newQuantity;
+
                 saveItems();
+
                 renderItems(canteenItems); // Re-render (and updates total value)
+
+
 
             } else if (action === 'delete') {
+
                 // Show confirmation modal
+
                 itemToDeleteId = itemId;
+
                 modalItemName.textContent = button.dataset.name;
+
                 deleteModal.classList.remove('hidden');
-            } else if (action === 'edit') {
-                openEditModal(itemId);
-            }
+
+            } 
+
+            // Removed: else if (action === 'edit') block
+
         });
+
+
 
         // Modal Button Handlers (Delete)
+
         cancelDeleteBtn.addEventListener('click', () => {
+
             deleteModal.classList.add('hidden');
+
             itemToDeleteId = null;
+
         });
+
+
 
         confirmDeleteBtn.addEventListener('click', () => {
+
             if (itemToDeleteId) {
+
                 // Remove the item from the array
+
                 canteenItems = canteenItems.filter(item => item.id !== itemToDeleteId);
+
                 saveItems();
+
                 renderItems(canteenItems); // Re-render (and updates total value)
+
                 
+
                 deleteModal.classList.add('hidden');
+
                 itemToDeleteId = null;
+
             }
+
         });
 
+        
+
+        // Removed: Modal Button Handlers (Edit) and editItemForm listener
+
+
+
+
+
         // --- Application Start ---
+
         const initApp = () => {
+
             loadItems();
+
             renderItems(canteenItems);
+
             
+
             // Hide loading, show content
+
             loadingIndicator.classList.add('hidden');
+
             mainContent.classList.remove('hidden');
+
         };
 
+
+
         // Start the application after all DOM content is loaded
+
         document.addEventListener('DOMContentLoaded', initApp);
+
     </script>
+
 </body>
+
 </html>
