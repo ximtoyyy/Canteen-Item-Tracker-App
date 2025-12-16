@@ -106,6 +106,43 @@
         </div>
     </div>
     
+    <!-- Modal for Editing Item -->
+    <div id="editModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-lg w-full">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Edit Item: <span id="editItemNameDisplay" class="text-indigo-600"></span></h3>
+            
+            <form id="editItemForm">
+                <input type="hidden" id="editItemId">
+                
+                <div class="mb-4">
+                    <label for="editItemName" class="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                    <input type="text" id="editItemName" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label for="editItemQuantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                        <input type="number" id="editItemQuantity" required min="0" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="editItemPrice" class="block text-sm font-medium text-gray-700 mb-1">Unit Price (₱)</label>
+                        <input type="number" id="editItemPrice" required min="0" step="0.01" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="editLowStockThreshold" class="block text-sm font-medium text-gray-700 mb-1">Threshold</label>
+                        <input type="number" id="editLowStockThreshold" required min="1" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+                
+                <div id="editError" class="text-red-500 text-sm mt-2 hidden"></div>
+
+                <div class="flex justify-end space-x-3 pt-4 border-t">
+                    <button type="button" id="cancelEditBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition duration-150">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition duration-150 shadow-lg shadow-indigo-200">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Application Logic using LocalStorage -->
     <script>
         // Global variables for local storage
@@ -123,12 +160,24 @@
         // Total value display
         const totalValueDisplay = document.getElementById('totalValueDisplay');
 
-        // Modal elements
+        // Delete Modal elements
         const deleteModal = document.getElementById('deleteModal');
         const modalItemName = document.getElementById('modalItemName');
         const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
         const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
         let itemToDeleteId = null;
+
+        // Edit Modal elements
+        const editModal = document.getElementById('editModal');
+        const editItemForm = document.getElementById('editItemForm');
+        const editItemNameDisplay = document.getElementById('editItemNameDisplay');
+        const editItemId = document.getElementById('editItemId');
+        const editItemName = document.getElementById('editItemName');
+        const editItemQuantity = document.getElementById('editItemQuantity');
+        const editItemPrice = document.getElementById('editItemPrice');
+        const editLowStockThreshold = document.getElementById('editLowStockThreshold');
+        const editError = document.getElementById('editError');
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
         
         // --- Local Storage Persistence ---
 
@@ -234,6 +283,11 @@
 
                     <div class="flex items-center space-x-3 w-full md:w-auto">
                         
+                        <!-- Edit Button -->
+                        <button data-id="${item.id}" data-action="edit" title="Edit item details" class="p-2 bg-indigo-100 text-indigo-600 rounded-full hover:bg-indigo-200 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                        </button>
+
                         <!-- Quantity Controls -->
                         <div class="flex items-center space-x-1">
                             <button data-id="${item.id}" data-action="decrement" class="p-2 bg-gray-200 text-gray-700 rounded-full hover:bg-gray-300 w-8 h-8 flex items-center justify-center transition disabled:opacity-50" ${item.quantity === 0 ? 'disabled' : ''}>
@@ -258,7 +312,70 @@
             calculateTotalValue();
         };
 
-        // --- Event Handlers ---
+        // --- Edit Modal Logic ---
+
+        /**
+         * Opens the edit modal and populates the form with item data.
+         * @param {string} itemId - The ID of the item to edit.
+         */
+        const openEditModal = (itemId) => {
+            const itemToEdit = canteenItems.find(item => item.id === itemId);
+            if (!itemToEdit) return;
+
+            editItemId.value = itemToEdit.id;
+            editItemName.value = itemToEdit.name;
+            editItemQuantity.value = itemToEdit.quantity;
+            editItemPrice.value = itemToEdit.price.toFixed(2);
+            editLowStockThreshold.value = itemToEdit.threshold;
+            
+            editItemNameDisplay.textContent = itemToEdit.name;
+            editError.classList.add('hidden');
+            editModal.classList.remove('hidden');
+        };
+        
+        /**
+         * Handles saving the changes from the edit modal.
+         */
+        editItemForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            editError.classList.add('hidden');
+
+            const id = editItemId.value;
+            const name = editItemName.value.trim();
+            const quantity = parseInt(editItemQuantity.value, 10);
+            const price = parseFloat(editItemPrice.value);
+            const threshold = parseInt(editLowStockThreshold.value, 10);
+
+            if (!name || isNaN(quantity) || isNaN(price) || isNaN(threshold) || quantity < 0 || price < 0 || threshold < 1) {
+                editError.textContent = "Please ensure all fields are valid (Quantity/Price >= 0, Threshold >= 1, Name not empty).";
+                editError.classList.remove('hidden');
+                return;
+            }
+
+            const itemIndex = canteenItems.findIndex(item => item.id === id);
+            if (itemIndex === -1) {
+                editError.textContent = "Item not found.";
+                editError.classList.remove('hidden');
+                return;
+            }
+
+            // Update the item properties
+            canteenItems[itemIndex].name = name;
+            canteenItems[itemIndex].quantity = quantity;
+            canteenItems[itemIndex].price = parseFloat(price.toFixed(2));
+            canteenItems[itemIndex].threshold = threshold;
+
+            saveItems();
+            renderItems(canteenItems);
+            editModal.classList.add('hidden');
+        });
+
+        // Cancel Edit button handler
+        cancelEditBtn.addEventListener('click', () => {
+            editModal.classList.add('hidden');
+        });
+
+        // --- General Event Handlers ---
 
         addItemForm.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -323,6 +440,8 @@
                 itemToDeleteId = itemId;
                 modalItemName.textContent = button.dataset.name;
                 deleteModal.classList.remove('hidden');
+            } else if (action === 'edit') {
+                openEditModal(itemId);
             }
         });
 
