@@ -1,278 +1,176 @@
 import streamlit as st
-import json
-import os
-from typing import List, Dict, Union
+import pandas as pd
+import uuid
 
-# --- Configuration ---
-DATA_FILE = "inventory.json"
-ITEM_DTYPE = Dict[str, Union[str, int, float]]
+# --- 1. CONFIGURATION ---
+st.set_page_config(layout="wide", page_title="Canteen Stock Tracker")
 
-# --- Persistence Functions (Adapted for Streamlit) ---
+# --- 2. STATE INITIALIZATION ---
 
-def load_items() -> List[ITEM_DTYPE]:
-    """Loads inventory items from the JSON data file."""
-    if not os.path.exists(DATA_FILE):
-        return []
-    try:
-        with open(DATA_FILE, 'r') as f:
-            data = json.load(f)
-            # Ensure quantities, prices, and thresholds are numeric types
-            for item in data:
-                item['quantity'] = int(item.get('quantity', 0))
-                item['price'] = float(item.get('price', 0.0))
-                item['threshold'] = int(item.get('threshold', 1))
-            return data
-    except (IOError, json.JSONDecodeError):
-        st.error(f"Error loading {DATA_FILE}. Starting with empty inventory.")
-        return []
+# Initialize session state for items and ID counter if not present
+if 'canteen_items' not in st.session_state:
+    st.session_state['canteen_items'] = []
 
-def save_items(items: List[ITEM_DTYPE]):
-    """Saves the current inventory items to the JSON data file."""
-    try:
-        with open(DATA_FILE, 'w') as f:
-            json.dump(items, f, indent=4)
-    except IOError:
-        st.error(f"Error: Could not write data to {DATA_FILE}.")
+if 'next_item_id' not in st.session_state:
+    st.session_state['next_item_id'] = 1
 
-def get_next_id(items: List) -> int:
-    """Calculates the next unique ID based on existing items."""
-    if not items:
-        return 1
-    # Find the maximum existing ID (converted to int) and add 1
-    max_id = 0
-    for item in items:
-        try:
-            max_id = max(max_id, int(item['id']))
-        except ValueError:
-            continue
-    return max_id + 1
+# Removed: 'edit_id' initialization
 
-# --- State Management & Actions ---
+# --- 3. CORE LOGIC FUNCTIONS ---
 
-def init_state():
-    """Initializes session state variables."""
-    if 'items' not in st.session_state:
-        st.session_state.items = load_items()
-    if 'next_id' not in st.session_state:
-        st.session_state.next_id = get_next_id(st.session_state.items)
-    if 'edit_id' not in st.session_state:
-        st.session_state.edit_id = None
-        
-def update_inventory_and_save():
-    """Saves the current session state items to the file."""
-    save_items(st.session_state.items)
-
-def add_item_action(name, quantity, price, threshold):
-    """Adds a new item to the inventory."""
+def add_item(name, quantity, price, threshold):
+    """Adds a new item to the session state."""
     new_item = {
-        "id": str(st.session_state.next_id),
-        "name": name,
-        "quantity": quantity,
-        "price": round(price, 2),
-        "threshold": threshold,
+        'id': str(uuid.uuid4()), # Use UUID for robust unique IDs
+        'name': name,
+        'quantity': int(quantity),
+        'price': round(float(price), 2),
+        'threshold': int(threshold),
     }
-    st.session_state.items.append(new_item)
-    st.session_state.next_id += 1
-    update_inventory_and_save()
-    st.success(f"Item '{name}' added successfully!")
+    st.session_state.canteen_items.append(new_item)
+    st.success(f"Added '{name}' to stock!")
 
-def update_quantity_action(item_id: str, change: int):
-    """Increases or decreases an item's quantity."""
-    item_index = next((i for i, item in enumerate(st.session_state.items) if item['id'] == item_id), -1)
-    
-    if item_index != -1:
-        item = st.session_state.items[item_index]
-        new_quantity = item['quantity'] + change
-        
-        if new_quantity >= 0:
-            item['quantity'] = new_quantity
-            update_inventory_and_save()
-        else:
-            st.warning("Quantity cannot be negative.")
+def update_quantity(item_id, change):
+    """Increments or decrements item quantity."""
+    for item in st.session_state.canteen_items:
+        if item['id'] == item_id:
+            new_quantity = item['quantity'] + change
+            item['quantity'] = max(0, new_quantity)
+            break
 
-def set_edit_mode(item_id: str):
-    """Sets the item ID for the edit form."""
-    st.session_state.edit_id = item_id
+def delete_item(item_id):
+    """Deletes an item from the session state."""
+    st.session_state.canteen_items = [item for item in st.session_state.canteen_items if item['id'] != item_id]
+    st.success("Item deleted successfully.")
 
-def delete_item_action(item_id: str):
-    """Deletes an item from the inventory."""
-    st.session_state.items = [item for item in st.session_state.items if item['id'] != item_id]
-    update_inventory_and_save()
-    st.success("Item deleted.")
+# Removed: set_edit_mode function
+# Removed: cancel_edit function
 
-# --- UI Components ---
+def calculate_total_value():
+    """Calculates the total monetary value of all items in stock."""
+    total_value = sum(item['quantity'] * item['price'] for item in st.session_state.canteen_items)
+    return total_value
+
+# --- 4. UI COMPONENTS ---
 
 def render_add_item_form():
-    """Renders the form for adding a new canteen item."""
-    st.sidebar.header("Add New Item")
-    with st.sidebar.form(key='add_form'):
-        name = st.text_input("Item Name", key='new_name')
-        quantity = st.number_input("Quantity in Stock", min_value=0, value=1, step=1, key='new_quantity')
-        price = st.number_input("Unit Price (₱)", min_value=0.0, value=1.00, step=0.01, format="%.2f", key='new_price')
-        threshold = st.number_input("Low Stock Threshold", min_value=1, value=5, step=1, key='new_threshold')
+    """Renders the form for adding a new item."""
+    st.markdown("### Add New Item")
+    with st.form("add_item_form", clear_on_submit=True):
+        name = st.text_input("Item Name", placeholder="e.g., Apple Juice")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            quantity = st.number_input("Quantity in Stock", min_value=0, value=1, step=1)
+        with col2:
+            price = st.number_input("Unit Price (₱)", min_value=0.00, value=1.00, step=0.01, format="%.2f")
+        with col3:
+            threshold = st.number_input("Low Stock Threshold", min_value=1, value=5, step=1)
         
-        submitted = st.form_submit_button("Add Item", type="primary")
-
+        submitted = st.form_submit_button("Add Item")
+        
         if submitted:
-            if name:
-                add_item_action(name, quantity, price, threshold)
+            if name and quantity >= 0 and price >= 0 and threshold >= 1:
+                add_item(name, quantity, price, threshold)
+                st.session_state.next_item_id += 1 
             else:
-                st.error("Item Name is required.")
+                st.error("Please ensure all fields are valid: Name is not empty, Quantity/Price ≥ 0, Threshold ≥ 1.")
+
+# Removed: render_edit_item_form function
 
 def render_inventory_list():
-    """Renders the main inventory table with controls."""
-    items = st.session_state.items
+    """Renders the main list of inventory items."""
+    st.markdown("### Current Item")
     
-    if not items:
-        st.info("Inventory is empty. Add items using the form on the sidebar.")
+    if not st.session_state.canteen_items:
+        st.info("No items in stock. Add your first item using the form on the left!")
         return
 
     # Sort items: Low stock first, then by name
-    sorted_items = sorted(items, key=lambda x: (x['quantity'] <= x['threshold'], x['name']))
+    sorted_items = sorted(st.session_state.canteen_items, 
+                         key=lambda x: (x['quantity'] <= x['threshold'], x['name']))
 
-    st.subheader("Inventory List")
+    # Adjusted columns: [Name (4), Price (2), Threshold (2), Stock (2), Actions (3)]
+    header_cols = st.columns([4, 2, 2, 2, 3])
+    header_cols[0].markdown("*Item Name*")
+    header_cols[1].markdown("*Price (₱)*")
+    header_cols[2].markdown("*Threshold*")
+    header_cols[3].markdown("*Stock*")
+    header_cols[4].markdown("*Actions*")
+    st.divider()
 
-    # Create columns for the table header
-    col_layout = [0.5, 2.5, 1, 1, 1, 2]
-    cols = st.columns(col_layout)
-    cols[0].write("**ID**")
-    cols[1].write("**Item Name**")
-    cols[2].write("**Quantity**")
-    cols[3].write("**Price (₱)**")
-    cols[4].write("**Threshold**")
-    cols[5].write("**Actions**")
-    st.markdown("---") # Separator line
-
-    # Render items row by row
     for item in sorted_items:
         is_low_stock = item['quantity'] <= item['threshold']
         
-        cols = st.columns(col_layout)
-        
-        # ID, Name, Quantity
-        cols[0].write(item['id'])
-        cols[1].markdown(f"**{'🚨' if is_low_stock else ''} {item['name']}**")
-        cols[2].markdown(f"**{item['quantity']}**")
-        
-        # Price, Threshold
-        cols[3].write(f"₱{item['price']:.2f}")
-        cols[4].write(item['threshold'])
+        # Streamlit containers for styling
+        with st.container(border=True):
+            # Adjusted columns for item rows
+            col_name, col_price, col_threshold, col_quantity, col_actions = st.columns([4, 2, 2, 2, 3])
 
-        # Action Buttons
-        with cols[5]:
-            # Use a container for better horizontal layout of small buttons
-            btn_cols = st.columns([1, 1, 1.5, 1.5])
-            
-            # Decrement button
-            btn_cols[0].button("–", key=f"dec_{item['id']}", 
-                               on_click=update_quantity_action, args=(item['id'], -1), 
-                               disabled=(item['quantity'] == 0), help="Decrement stock by 1")
-            
-            # Increment button
-            btn_cols[1].button("+", key=f"inc_{item['id']}", 
-                               on_click=update_quantity_action, args=(item['id'], 1), 
-                               type="primary", help="Increment stock by 1")
+            with col_name:
+                prefix = "🚨 " if is_low_stock else ""
+                st.markdown(f"*{prefix}{item['name']}*")
 
-            # Edit button
-            btn_cols[2].button("Edit", key=f"edit_{item['id']}", 
-                               on_click=set_edit_mode, args=(item['id'],), 
-                               help="Edit item details", use_container_width=True)
-            
-            # Delete button
-            btn_cols[3].button("Del", key=f"del_{item['id']}", 
-                               on_click=delete_item_action, args=(item['id'],), 
-                               help="Delete item permanently", type="secondary", use_container_width=True)
+            with col_price:
+                st.markdown(f"₱{item['price']:.2f}")
 
-def render_inventory_summary():
-    """Calculates and displays the total inventory value."""
-    total_value = sum(item['quantity'] * item['price'] for item in st.session_state.items)
-    total_items = len(st.session_state.items)
-    low_stock_count = sum(1 for item in st.session_state.items if item['quantity'] <= item['threshold'])
+            with col_threshold:
+                st.markdown(f"{item['threshold']}")
 
-    col1, col2, col3 = st.columns(3)
-    
-    col1.metric(
-        label="Total Inventory Value", 
-        value=f"₱{total_value:,.2f}", 
-        delta="Calculated based on current stock"
-    )
-    col2.metric(
-        label="Total Unique Items",
-        value=total_items,
-    )
-    col3.metric(
-        label="Low Stock Alerts",
-        value=low_stock_count,
-        delta_color="inverse"
-    )
-    
-    st.markdown("---")
-
-def render_edit_form():
-    """Renders the edit form if an item is selected for editing."""
-    item_id = st.session_state.edit_id
-    if item_id is None:
-        return
-    
-    try:
-        item_to_edit = next(item for item in st.session_state.items if item['id'] == item_id)
-    except StopIteration:
-        st.session_state.edit_id = None # Item not found, reset state
-        return
-
-    st.header(f"✏️ Edit Item: {item_to_edit['name']}")
-    
-    # Use a container for the edit form
-    with st.container(border=True):
-        with st.form(key='edit_form', clear_on_submit=False):
-            st.markdown(f"Editing Item ID: `{item_id}`")
+            with col_quantity:
+                st.markdown(f"<p style='font-size: 1.5rem; font-weight: bold; color: {'red' if is_low_stock else 'green'};'>{item['quantity']}</p>", unsafe_allow_html=True)
             
-            # Pre-populate fields with current values
-            new_name = st.text_input("Item Name", value=item_to_edit['name'], key='edit_name')
-            
-            col_q, col_p, col_t = st.columns(3)
-            new_quantity = col_q.number_input("Quantity", min_value=0, value=item_to_edit['quantity'], step=1, key='edit_quantity')
-            new_price = col_p.number_input("Unit Price (₱)", min_value=0.0, value=item_to_edit['price'], step=0.01, format="%.2f", key='edit_price')
-            new_threshold = col_t.number_input("Threshold", min_value=1, value=item_to_edit['threshold'], step=1, key='edit_threshold')
-
-            col_submit, col_cancel = st.columns([1, 4])
-            
-            save_button = col_submit.form_submit_button("Save Changes", type="primary")
-            col_cancel.button("Cancel", on_click=lambda: st.session_state.__setitem__('edit_id', None))
-            
-            if save_button:
-                item_to_edit['name'] = new_name
-                item_to_edit['quantity'] = new_quantity
-                item_to_edit['price'] = round(new_price, 2)
-                item_to_edit['threshold'] = new_threshold
+            with col_actions:
+                # Use a smaller column layout for the 3 remaining buttons (+, -, Del)
+                btn_col1, btn_col2, btn_col3 = st.columns(3) 
                 
-                update_inventory_and_save()
-                st.session_state.edit_id = None # Exit edit mode
-                st.rerun() # Rerun to refresh the list
+                # Decrement button
+                with btn_col1:
+                    st.button("➖", key=f"dec_{item['id']}", on_click=update_quantity, args=(item['id'], -1), help="Decrement stock")
+                
+                # Increment button
+                with btn_col2:
+                    st.button("➕", key=f"inc_{item['id']}", on_click=update_quantity, args=(item['id'], 1), help="Increment stock")
+                
+                # Delete button with confirmation
+                with btn_col3:
+                    if st.button("🗑️", key=f"del_{item['id']}", help="Delete item"):
+                        # Streamlit confirmation: use a temporary session state variable
+                        st.session_state[f'confirm_delete_{item["id"]}'] = True
+                
+                # Deletion Confirmation Logic
+                if st.session_state.get(f'confirm_delete_{item["id"]}'):
+                    st.warning(f"Confirm deletion of *{item['name']}*?", icon="⚠️")
+                    confirm_col1, confirm_col2 = st.columns(2)
+                    with confirm_col1:
+                        st.button("Yes, Delete", key=f"confirm_{item['id']}", on_click=delete_item, args=(item['id'],), type="primary")
+                    with confirm_col2:
+                        st.button("Cancel", key=f"cancel_{item['id']}", on_click=lambda: st.session_state.pop(f'confirm_delete_{item["id"]}'), type="secondary")
+                        st.stop() # Stop execution to wait for confirmation
 
-# --- Main App Execution ---
+# --- 5. MAIN APP EXECUTION ---
 
-def main_app():
-    """Runs the main Streamlit application."""
-    st.set_page_config(layout="wide", page_title="Canteen Inventory Tracker", page_icon="📝")
+st.title("🧺 Canteen Item Tracker")
 
-    st.title("📝 Canteen Inventory Tracker (Streamlit)")
-    st.caption("Data is persisted in `inventory.json` locally.")
+# Create the two main columns for the layout
+col_form, col_list = st.columns([1, 2], gap="large")
 
-    init_state()
+with col_form:
+    # Removed conditional check for edit_id
+    render_add_item_form() 
 
-    # 1. Sidebar for Adding Items
-    render_add_item_form()
-
-    # 2. Main Content Area
+with col_list:
+    total_value = calculate_total_value()
     
-    # If an item is selected for editing, show the edit form
-    if st.session_state.edit_id is not None:
-        render_edit_form()
-    else:
-        # Otherwise, show the summary and the main list
-        render_inventory_summary()
-        render_inventory_list()
+    # Display Total Item Value
+    st.markdown(
+        f"""
+        <div style='background-color: #e0f2fe; padding: 15px; border-radius: 8px; border: 1px solid #90cdf4; display: flex; justify-content: space-between; align-items: center;'>
+            <span style='font-size: 1.1rem; font-weight: 500; color: #1e40af;'>Total Item Value:</span>
+            <span style='font-size: 1.8rem; font-weight: 700; color: #1d4ed8;'>₱{total_value:,.2f}</span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-if __name__ == '__main__':
-    main_app()
+    st.markdown("---")
+    render_inventory_list()
